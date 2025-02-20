@@ -28,12 +28,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Dynamické přidání inputů pro růst podle roku
     const currentYear = new Date('2025-02-20').getFullYear();
     const growthInputsDiv = document.getElementById('growthInputs');
-    growthInputsDiv.innerHTML = ''; // Vyčistíme obsah
-
-    // Seznam let pro kontrolu duplicit
+    growthInputsDiv.innerHTML = '';
     const addedYears = new Set();
     for (let year = 2025; year <= currentYear; year++) {
-        if (addedYears.has(year)) continue; // Přeskočíme, pokud už byl přidán
+        if (addedYears.has(year)) continue;
         addedYears.add(year);
 
         const label = document.createElement('label');
@@ -74,14 +72,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Případ 2: TSLA opce - simulace převedená na Kč s reálným kurzem
+    // Případ 2: TSLA opce - načítání z JSON a simulace pro budoucnost
     async function calculateOptionsDaily(exchangeRate) {
-        const initialValueUSD = 14 * 55.67;
+        const initialValueUSD = 14 * 55.67; // 779.38 USD
         const initialValueCZK = initialValueUSD * exchangeRate;
-        return days.map((_, index) => {
-            if (index === 0) return 0;
-            const growthUSD = initialValueUSD * 0.01;
-            return (initialValueUSD + growthUSD) * exchangeRate - initialValueCZK;
+
+        // Načtení historických dat z options_data.json
+        let historicalPrices = [];
+        try {
+            const response = await fetch('./options_data.json');
+            const data = await response.json();
+            historicalPrices = data.prices;
+        } catch (error) {
+            console.warn('Načítání options_data.json selhalo:', error);
+            historicalPrices = [{ date: "19.02.2025", price: 55.67 }];
+        }
+
+        return days.map(day => {
+            const historicalEntry = historicalPrices.find(entry => entry.date === day);
+            if (historicalEntry) {
+                return (historicalEntry.price * 14 - initialValueUSD) * exchangeRate;
+            }
+            // Simulace pro dny bez historických dat
+            const lastKnownPriceUSD = historicalPrices[historicalPrices.length - 1].price;
+            const growthUSD = lastKnownPriceUSD * 0.01; // 1% růst od poslední známé ceny
+            return (lastKnownPriceUSD + growthUSD) * exchangeRate - initialValueCZK;
         });
     }
 
