@@ -11,22 +11,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         days.push(new Date(d).toLocaleDateString('cs-CZ'));
     }
 
-    // Načtení směnného kurzu z API ČNB přes proxy
-    async function getExchangeRate() {
-        const today = new Date('2025-02-20').toISOString().split('T')[0];
-        const proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
-        const cnbUrl = `https://api.cnb.cz/cnbapi/exrates/daily?date=${today}&lang=EN`;
-        try {
-            const response = await fetch(proxyUrl + cnbUrl);
-            const data = await response.json();
-            const usdRate = data.rates.find(rate => rate.currencyCode === 'USD');
-            return usdRate ? usdRate.rate / usdRate.amount : 23;
-        } catch (error) {
-            console.warn('Načítání kurzu z ČNB selhalo:', error);
-            return 23; // Fallback hodnota
-        }
-    }
-
     // Dynamické přidání inputů pro růst podle roku
     const currentYear = new Date('2025-02-20').getFullYear();
     const growthInputsDiv = document.getElementById('growthInputs');
@@ -74,10 +58,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Případ 2: TSLA opce - vrací zisk a cenu opce pro tooltip
-    async function calculateOptionsDaily(exchangeRate) {
+    // Případ 2: TSLA opce - vrací zisk a cenu opce z JSON
+    async function calculateOptionsDaily() {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
-        const initialValueCZK = initialValueUSD * exchangeRate;
 
         let historicalPrices = [];
         try {
@@ -86,19 +69,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             historicalPrices = data.prices;
         } catch (error) {
             console.warn('Načítání options_data.json selhalo:', error);
-            historicalPrices = [{ date: "19.02.2025", price: 55.67 }];
+            historicalPrices = [{ date: "19.02.2025", optionPrice: 55.67, exchangeRate: 23 }];
         }
 
         return days.map(day => {
             const historicalEntry = historicalPrices.find(entry => entry.date === day);
-            let priceUSDPerOption;
+            let priceUSDPerOption, exchangeRate;
             if (historicalEntry) {
-                priceUSDPerOption = historicalEntry.price; // Cena za 1 opci v USD
+                priceUSDPerOption = historicalEntry.optionPrice;
+                exchangeRate = historicalEntry.exchangeRate;
             } else {
-                const lastKnownPriceUSD = historicalPrices[historicalPrices.length - 1].price;
-                priceUSDPerOption = lastKnownPriceUSD + (lastKnownPriceUSD * 0.01); // Simulace 1% růstu
+                const lastEntry = historicalPrices[historicalPrices.length - 1];
+                priceUSDPerOption = lastEntry.optionPrice + (lastEntry.optionPrice * 0.01); // Simulace 1% růstu
+                exchangeRate = lastEntry.exchangeRate; // Použije poslední známý kurz
             }
-            const priceUSDTotal = priceUSDPerOption * 14; // Celková hodnota 14 opcí
+            const priceUSDTotal = priceUSDPerOption * 14;
             const profitCZK = (priceUSDTotal - initialValueUSD) * exchangeRate;
             return { profitCZK: profitCZK, priceUSD: priceUSDPerOption };
         });
@@ -120,10 +105,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Funkce pro aktualizaci grafu
     async function updateChart() {
-        const exchangeRate = await getExchangeRate();
         const flatData = calculateFlatDaily();
-        const optionsDataFull = await calculateOptionsDaily(exchangeRate);
-        const optionsData = optionsDataFull.map(d => d.profitCZK); // Pouze zisk pro graf
+        const optionsDataFull = await calculateOptionsDaily();
+        const optionsData = optionsDataFull.map(d => d.profitCZK);
         const flatAgg = aggregateData(flatData, view);
         const optionsAgg = aggregateData(optionsDataFull, view);
 
@@ -140,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         borderColor: '#fff', 
                         fill: false, 
                         tension: 0.1, 
-                        customData: optionsAgg.customData // Předáváme custom data pro tooltip
+                        customData: optionsAgg.customData 
                     }
                 ]
             },

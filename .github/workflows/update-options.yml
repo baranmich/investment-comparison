@@ -1,24 +1,46 @@
-name: Update Options Price
-on:
-  schedule:
-    - cron: '0 0 * * *' # Každý den v 00:00 UTC
-  workflow_dispatch: # Možnost spustit ručně
+const fs = require('fs');
 
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20' # Novější verze s nativním fetch
-      - name: Update options data
-        run: node update-options.js
-      - name: Commit changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add options_data.json
-          git commit -m "Updated options price for $(date +%Y-%m-%d)" || echo "No changes"
-          git push
+async function updateOptionsPrice() {
+    const today = new Date('2025-02-20').toLocaleDateString('cs-CZ');
+    const cnbUrl = `https://api.cnb.cz/cnbapi/exrates/daily?date=2025-02-20&lang=EN`;
+    const yahooUrl = 'https://finance.yahoo.com/quote/TSLA/options/?date=1813190400&strike=800&straddle=true';
+    let exchangeRate = 23; // Fallback
+    let optionPrice = 55.67; // Fallback
+
+    // Načtení směnného kurzu z ČNB
+    try {
+        const cnbResponse = await fetch(cnbUrl);
+        const cnbData = await cnbResponse.json();
+        const usdRate = cnbData.rates.find(rate => rate.currencyCode === 'USD');
+        exchangeRate = usdRate ? usdRate.rate / usdRate.amount : 23;
+    } catch (error) {
+        console.error('Chyba při načítání kurzu z ČNB:', error);
+    }
+
+    // Načtení ceny opce z Yahoo Finance
+    try {
+        const yahooResponse = await fetch(yahooUrl);
+        const html = await yahooResponse.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const rows = doc.querySelectorAll('table tbody tr');
+        rows.forEach(row => {
+            const strike = parseFloat(row.cells[1]?.textContent);
+            const type = row.cells[0]?.textContent.includes('CALL') ? 'CALL' : 'PUT';
+            if (strike === 800 && type === 'CALL') {
+                optionPrice = parseFloat(row.cells[2]?.textContent) || 55.67;
+            }
+        });
+    } catch (error) {
+        console.error('Chyba při načítání ceny opce:', error);
+    }
+
+    // Aktualizace JSON
+    const jsonData = JSON.parse(fs.readFileSync('options_data.json', 'utf8'));
+    if (!jsonData.prices.some(entry => entry.date === today)) {
+        jsonData.prices.push({ date: today, optionPrice: optionPrice, exchangeRate: exchangeRate });
+        fs.writeFileSync('options_data.json', JSON.stringify(jsonData, null, 2));
+    }
+}
+
+updateOptionsPrice();

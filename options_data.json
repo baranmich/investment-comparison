@@ -1,5 +1,5 @@
 {
     "prices": [
-        {"date": "19.02.2025", "price": 55.67}
+        {"date": "19.02.2025", "optionPrice": 55.67, "exchangeRate": 23}
     ]
 }
