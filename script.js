@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let price = flatBasePrice;
         let totalRent = 0;
 
-        return days.map(day => {
+        const result = days.map(day => {
             const currentDate = new Date(day.split('.').reverse().join('-'));
             const year = currentDate.getFullYear();
             const growthInput = document.getElementById(`growthInput-${year}`);
@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return price - flatBasePrice + totalRent;
         });
+        console.log('Flat Data:', result); // Ladící výpis
+        return result;
     }
 
     // Případ 2: TSLA opce - vrací zisk a cenu opce z JSON
@@ -71,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             historicalPrices = [{ date: "19.02.2025", optionPrice: 55.67, exchangeRate: 23 }];
         }
 
-        return days.map(day => {
+        const result = days.map(day => {
             const historicalEntry = historicalPrices.find(entry => entry.date === day);
             let priceUSDPerOption, exchangeRate;
             if (historicalEntry) {
@@ -86,12 +88,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const profitCZK = (priceUSDTotal - initialValueUSD) * exchangeRate;
             return { profitCZK: profitCZK, priceUSD: priceUSDPerOption };
         });
+        console.log('Options Data:', result); // Ladící výpis
+        return result;
     }
 
     // Agregace dat pro denní/týdenní/měsíční zobrazení
     function aggregateData(data, period, isFlat = false) {
         if (isFlat) {
-            // Pro Případ 1 - flatData je prosté pole čísel
             if (period === 'daily') return { labels: days, values: data };
             const result = { labels: [], values: [] };
             let step = period === 'weekly' ? 7 : 30;
@@ -102,7 +105,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return result;
         } else {
-            // Pro Případ 2 - optionsDataFull je pole objektů
             if (period === 'daily') return { labels: days, values: data.map(item => item.profitCZK), customData: data };
             const result = { labels: [], values: [], customData: [] };
             let step = period === 'weekly' ? 7 : 30;
@@ -120,8 +122,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function updateChart() {
         const flatData = calculateFlatDaily();
         const optionsDataFull = await calculateOptionsDaily();
-        const flatAgg = aggregateData(flatData, view, true); // Případ 1
-        const optionsAgg = aggregateData(optionsDataFull, view); // Případ 2
+        const flatAgg = aggregateData(flatData, view, true);
+        const optionsAgg = aggregateData(optionsDataFull, view);
 
         if (chart) chart.destroy();
         chart = new Chart(ctx, {
