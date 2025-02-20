@@ -13,28 +13,33 @@
         <div class="cases">
             <div class="case">
                 <h2>Případ 1: Nákup bytu A2.313</h2>
-                <p>Inzerovaná cena: 8 288 911 Kč<br>
-                   Kupní cena po slevě 8 %: 7 625 798 Kč<br>
-                   Dotovaná hypotéka: 2,79 %, sleva 292 068 Kč<br>
-                   Okamžité náklady: Provize 152 516 Kč, kuchyně 150 000 Kč, záloha 228 774 Kč<br>
-                   Hypotéka: 80 % LTV, vlastní zdroje 531 290 Kč<br>
-                   Nájemné od 7/2025: 24 200 Kč (roční růst 5 %)<br>
-                   SVJ od 7/2025: 1 012 Kč (roční růst 10 %)<br>
-                   Správa: 10 % z nájemného<br>
-                   Růst ceny nemovitosti: 3 % (2025), 5 % (další roky)</p>
+                <p>Inzerovaná cena: <span class="amount">8 288 911 Kč</span></p>
+                <p>Kupní cena po slevě 8 %: <span class="amount">7 625 798 Kč</span></p>
+                <p>Dotovaná hypotéka: 2,79 %, sleva <span class="amount">292 068 Kč</span></p>
+                <p>Okamžité náklady: Provize <span class="amount">152 516 Kč</span>, kuchyně <span class="amount">150 000 Kč</span>, záloha <span class="amount">228 774 Kč</span></p>
+                <p>Hypotéka: 80 % LTV, vlastní zdroje <span class="amount">531 290 Kč</span></p>
+                <p>Nájemné od 7/2025: <span class="amount">24 200 Kč</span> (roční růst 5 %)</p>
+                <p>SVJ od 7/2025: <span class="amount">1 012 Kč</span> (roční růst 10 %)</p>
+                <p>Správa: 10 % z nájemného</p>
+                <p>Růst ceny nemovitosti: 3 % (2025), 5 % (další roky)</p>
             </div>
             <div class="case">
                 <h2>Případ 2: Investice do TSLA opcí</h2>
-                <p>Profinancovaný pozemek: 1 380 000 Kč + ušetřené zdroje 531 290 Kč<br>
-                   Celkem: 79 273 USD<br>
-                   Nákup: 14 TSLA Jun17'27 800 CALL za 55,67 USD/ks<br>
-                   Aktuální hodnota: Načtena z API (koncem dne)</p>
+                <p>Zpětně profinancovaný pozemek: <span class="amount">1 380 000 Kč</span> + ušetřené zdroje <span class="amount">531 290 Kč</span></p>
+                <p>Celkem: <span class="amount">79 273 USD</span></p>
+                <p>Nákup: 14 TSLA Jun17'27 800 CALL za <span class="amount">55,67 USD/ks</span></p>
+                <p>Aktuální hodnota: Načtena z API (koncem dne)</p>
             </div>
         </div>
     </header>
     <main>
-        <label for="growthInput">Nastav růst nemovitosti pro rok (2025-): </label>
-        <input type="number" id="growthInput" value="3" min="0" step="0.1"> %
+        <label for="growthInput">Nastav růst nemovitosti (%):</label>
+        <input type="number" id="growthInput" value="3" min="0" step="0.1">
+        <div id="viewSelector">
+            <button class="active" onclick="changeView('daily')">Denní</button>
+            <button onclick="changeView('weekly')">Týdenní</button>
+            <button onclick="changeView('monthly')">Měsíční</button>
+        </div>
         <canvas id="investmentChart"></canvas>
         <div id="profit">
             <p>Zhodnocení Případ 1: <span id="profit1">0 Kč</span></p>
