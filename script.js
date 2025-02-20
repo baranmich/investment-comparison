@@ -1,57 +1,76 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const ctx = document.getElementById('investmentChart').getContext('2d');
     const growthInput = document.getElementById('growthInput');
     let chart;
-    let view = 'daily'; // Výchozí zobrazení
+    let view = 'daily';
 
-    // Datum od začátku roku 2025 do dneška (20. 2. 2025)
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-02-20'); // Dnešní datum
+    // Datum od 19. 2. 2025 do dneška (20. 2. 2025)
+    const startDate = new Date('2025-02-19');
+    const endDate = new Date('2025-02-20');
     const days = [];
-    const dailyDataFlat = [];
-    const dailyDataOptions = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         days.push(new Date(d).toLocaleDateString('cs-CZ'));
     }
 
-    // Výpočet Případu 1: Byt
+    // Případ 1: Byt - růst ceny + nájemné od 7/2025
     function calculateFlatDaily() {
         const flatBasePrice = 8288911;
         let price = flatBasePrice;
         let totalRent = 0;
-        let totalSVJ = 0;
-        let totalManagement = 0;
-        const dailyGrowth = (1 + parseFloat(growthInput.value) / 100) ** (1 / 365); // Denní složené úročení
-        const initialCosts = 152516 + 150000 + 228774 + 531290;
-        const loan = 7625798 - 292068;
-        const dailyInterest = (1 + 0.0479) ** (1 / 365) - 1; // Denní úrok hypotéky
+        const dailyGrowth = (1 + parseFloat(growthInput.value) / 100) ** (1 / 365);
 
-        return days.map((day, index) => {
-            price = price * dailyGrowth; // Růst ceny nemovitosti
-            const daysSinceStart = index + 1;
-            const interest = loan * dailyInterest * daysSinceStart;
-
-            // Nájemné, SVJ, správa od 7/2025
+        return days.map(day => {
+            price = price * dailyGrowth;
+            const currentDate = new Date(day.split('.').reverse().join('-'));
             const rentStart = new Date('2025-07-01');
-            if (new Date(day.split('.').reverse().join('-')) >= rentStart) {
-                const daysRented = Math.max(0, (new Date(day.split('.').reverse().join('-')) - rentStart) / (1000 * 60 * 60 * 24));
-                totalRent = 24200 * (daysRented / 30); // Přibližný měsíční nájem
-                totalSVJ = 1012 * (daysRented / 30);
-                totalManagement = totalRent * 0.1;
+            if (currentDate >= rentStart && currentDate.getDate() === 1) {
+                const monthsSinceRentStart = (currentDate.getFullYear() - 2025) * 12 + currentDate.getMonth() - 6;
+                totalRent += 24200 * (1.05 ** Math.floor(monthsSinceRentStart / 12));
             }
-
-            return price - flatBasePrice + totalRent - totalSVJ - totalManagement - initialCosts - interest;
+            return price - flatBasePrice + totalRent;
         });
     }
 
-    // Výpočet Případu 2: TSLA opce (simulace, reálná data přes API později)
-    function calculateOptionsDaily() {
-        const tslaOptions = 14 * 55.67; // 779.38 USD
-        const dailyGrowth = 1.001; // Simulovaný růst 0.1 % denně (nahradíš reálnými daty)
-        return days.map((_, index) => tslaOptions * (dailyGrowth ** index) - tslaOptions);
+    // Případ 2: TSLA opce - načítání z JSON a aktuální ceny
+    async function calculateOptionsDaily() {
+        const initialValue = 14 * 55.67; // 779.38 USD (nákup 19. 2. 2025)
+
+        // Načti historická data z JSON
+        const jsonResponse = await fetch('./options_data.json');
+        const jsonData = await jsonResponse.json();
+        const historicalPrices = jsonData.prices;
+
+        // Načti aktuální cenu z Yahoo Finance
+        const proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
+        const yahooUrl = 'https://finance.yahoo.com/quote/TSLA/options/?date=1813190400&strike=800&straddle=true';
+        let currentPrice = historicalPrices[historicalPrices.length - 1].price; // Poslední známá cena
+        try {
+            const response = await fetch(proxyUrl + yahooUrl);
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const rows = doc.querySelectorAll('table tbody tr');
+            rows.forEach(row => {
+                const strike = parseFloat(row.cells[1]?.textContent);
+                const type = row.cells[0]?.textContent.includes('CALL') ? 'CALL' : 'PUT';
+                if (strike === 800 && type === 'CALL') {
+                    currentPrice = parseFloat(row.cells[2]?.textContent) || currentPrice;
+                }
+            });
+        } catch (error) {
+            console.error('Chyba při načítání dat z Yahoo:', error);
+        }
+
+        // Vytvoř pole zisku pro každý den
+        const optionsData = days.map(day => {
+            const historicalEntry = historicalPrices.find(entry => entry.date === day);
+            const price = historicalEntry ? historicalEntry.price : currentPrice;
+            return (price * 14) - initialValue;
+        });
+        return optionsData;
     }
 
-    // Agregace dat pro týdenní a měsíční zobrazení
+    // Agregace dat
     function aggregateData(data, period) {
         if (period === 'daily') return { labels: days, values: data };
         const result = { labels: [], values: [] };
@@ -63,9 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return result;
     }
 
-    function updateChart() {
+    async function updateChart() {
         const flatData = calculateFlatDaily();
-        const optionsData = calculateOptionsDaily();
+        const optionsData = await calculateOptionsDaily();
         const flatAgg = aggregateData(flatData, view);
         const optionsAgg = aggregateData(optionsData, view);
 
@@ -97,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('profit2').textContent = `${optionsData[optionsData.length - 1].toFixed(2)} USD`;
     }
 
-    // Přepínání zobrazení
     window.changeView = (newView) => {
         view = newView;
         document.querySelectorAll('#viewSelector button').forEach(btn => {
@@ -107,5 +125,5 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     growthInput.addEventListener('change', updateChart);
-    updateChart(); // Počáteční vykreslení
+    await updateChart();
 });
