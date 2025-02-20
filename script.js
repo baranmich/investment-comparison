@@ -77,7 +77,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
         const initialValueCZK = initialValueUSD * exchangeRate;
 
-        // Načtení historických dat z options_data.json
         let historicalPrices = [];
         try {
             const response = await fetch('./options_data.json');
@@ -88,26 +87,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             historicalPrices = [{ date: "19.02.2025", price: 55.67 }];
         }
 
-        const optionsData = days.map(day => {
+        return days.map(day => {
             const historicalEntry = historicalPrices.find(entry => entry.date === day);
+            let priceUSD;
             if (historicalEntry) {
-                const priceUSD = historicalEntry.price * 14; // Celková hodnota 14 opcí
-                const profitCZK = (priceUSD - initialValueUSD) * exchangeRate;
-                return { y: profitCZK, priceUSD: priceUSD }; // Vracíme zisk i cenu
+                priceUSD = historicalEntry.price * 14; // Celková hodnota 14 opcí
+            } else {
+                const lastKnownPriceUSD = historicalPrices[historicalPrices.length - 1].price;
+                const growthUSD = lastKnownPriceUSD * 0.01;
+                priceUSD = (lastKnownPriceUSD + growthUSD) * 14;
             }
-            // Simulace pro dny bez historických dat
-            const lastKnownPriceUSD = historicalPrices[historicalPrices.length - 1].price;
-            const growthUSD = lastKnownPriceUSD * 0.01;
-            const priceUSD = (lastKnownPriceUSD + growthUSD) * 14;
             const profitCZK = (priceUSD - initialValueUSD) * exchangeRate;
-            return { y: profitCZK, priceUSD: priceUSD };
+            return { profitCZK, priceUSD }; // Vracíme zisk i cenu
         });
-        return optionsData;
     }
 
     // Agregace dat pro denní/týdenní/měsíční zobrazení
     function aggregateData(data, period) {
-        if (period === 'daily') return { labels: days, values: data };
+        if (period === 'daily') return { labels: days, values: data.map(d => d.profitCZK) };
         const result = { labels: [], values: [] };
         let step = period === 'weekly' ? 7 : 30;
         for (let i = 0; i < data.length; i += step) {
@@ -122,9 +119,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const exchangeRate = await getExchangeRate();
         const flatData = calculateFlatDaily();
         const optionsDataFull = await calculateOptionsDaily(exchangeRate);
-        const optionsData = optionsDataFull.map(d => d.y); // Pouze zisk pro graf
+        const optionsData = optionsDataFull.map(d => d.profitCZK); // Pouze zisk pro graf
         const flatAgg = aggregateData(flatData, view);
-        const optionsAgg = aggregateData(optionsData, view);
+        const optionsAgg = aggregateData(optionsDataFull, view);
 
         if (chart) chart.destroy();
         chart = new Chart(ctx, {
@@ -133,7 +130,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 labels: flatAgg.labels,
                 datasets: [
                     { label: 'Případ 1: Byt (Kč)', data: flatAgg.values, borderColor: '#1d9bf0', fill: false, tension: 0.1 },
-                    { label: 'Případ 2: TSLA (Kč)', data: optionsAgg.values, borderColor: '#fff', fill: false, tension: 0.1, customData: optionsDataFull }
+                    { 
+                        label: 'Případ 2: TSLA (Kč)', 
+                        data: optionsAgg.values.map(d => d.profitCZK), 
+                        borderColor: '#fff', 
+                        fill: false, 
+                        tension: 0.1, 
+                        customData: optionsDataFull 
+                    }
                 ]
             },
             options: {
@@ -155,7 +159,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             label: function(context) {
                                 const value = context.parsed.y;
                                 if (context.dataset.label === 'Případ 2: TSLA (Kč)') {
-                                    const priceUSD = context.dataset.customData[context.dataIndex].priceUSD;
+                                    const index = context.dataIndex;
+                                    const priceUSD = context.dataset.customData[index].priceUSD;
                                     return `${context.dataset.label}: ${value.toFixed(2)} Kč (Cena opcí: ${priceUSD.toFixed(2)} USD)`;
                                 }
                                 return `${context.dataset.label}: ${value.toFixed(2)} Kč`;

@@ -23,29 +23,4 @@ jobs:
           git config --local user.name "GitHub Action"
           git add options_data.json
           git commit -m "Updated options price for $(date +%Y-%m-%d)" || echo "No changes"
-          git pushname: Update Options Price
-on:
-  schedule:
-    - cron: '0 0 * * *' # Každý den v 00:00 UTC
-  workflow_dispatch: # Možnost spustit ručně
-
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-      - name: Install dependencies
-        run: npm install node-fetch@2
-      - name: Update options data
-        run: node update-options.js
-      - name: Commit changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add options_data.json
-          git commit -m "Updated options price for $(date +%Y-%m-%d)" || echo "No changes"
           git push
