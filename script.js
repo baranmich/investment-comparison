@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Dynamické přidání inputů pro růst podle roku
     const currentYear = new Date('2025-02-20').getFullYear();
     const growthInputsDiv = document.getElementById('growthInputs');
+    growthInputsDiv.innerHTML = ''; // Vyčistíme obsah, aby se nepřidávalo víckrát
     for (let year = 2025; year <= currentYear; year++) {
         const label = document.createElement('label');
         label.setAttribute('for', `growthInput-${year}`);
@@ -35,12 +36,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const input = document.createElement('input');
         input.type = 'number';
         input.id = `growthInput-${year}`;
-        input.value = year === 2025 ? 3 : 5; // 3 % pro 2025, 5 % pro další roky
+        input.value = year === 2025 ? 3 : 5;
         input.min = '0';
         input.step = '0.1';
         growthInputsDiv.appendChild(label);
         growthInputsDiv.appendChild(input);
-        input.addEventListener('change', updateChart); // Aktualizace grafu při změně
+        growthInputsDiv.appendChild(document.createElement('br')); // Odřádkování pro přehlednost
+        input.addEventListener('change', updateChart);
     }
 
     // Případ 1: Byt - růst ceny + nájemné od 7/2025
@@ -53,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const currentDate = new Date(day.split('.').reverse().join('-'));
             const year = currentDate.getFullYear();
             const growthInput = document.getElementById(`growthInput-${year}`);
-            const yearlyGrowth = growthInput ? parseFloat(growthInput.value) / 100 : 0.03; // Default 3 %
+            const yearlyGrowth = growthInput ? parseFloat(growthInput.value) / 100 : 0.03;
             const dailyGrowth = (1 + yearlyGrowth) ** (1 / 365);
             price = price * dailyGrowth;
 
@@ -68,7 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Případ 2: TSLA opce - simulace převedená na Kč s reálným kurzem
     async function calculateOptionsDaily(exchangeRate) {
-        const initialValueUSD = 14 * 55.67; // 779.38 USD
+        const initialValueUSD = 14 * 55.67;
         const initialValueCZK = initialValueUSD * exchangeRate;
         return days.map((_, index) => {
             if (index === 0) return 0;
