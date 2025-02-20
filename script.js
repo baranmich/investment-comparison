@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Případ 2: TSLA opce - načítání z JSON a simulace pro budoucnost
+    // Případ 2: TSLA opce - vrací zisk a cenu opce pro tooltip
     async function calculateOptionsDaily(exchangeRate) {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
         const initialValueCZK = initialValueUSD * exchangeRate;
@@ -88,16 +88,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             historicalPrices = [{ date: "19.02.2025", price: 55.67 }];
         }
 
-        return days.map(day => {
+        const optionsData = days.map(day => {
             const historicalEntry = historicalPrices.find(entry => entry.date === day);
             if (historicalEntry) {
-                return (historicalEntry.price * 14 - initialValueUSD) * exchangeRate;
+                const priceUSD = historicalEntry.price * 14; // Celková hodnota 14 opcí
+                const profitCZK = (priceUSD - initialValueUSD) * exchangeRate;
+                return { y: profitCZK, priceUSD: priceUSD }; // Vracíme zisk i cenu
             }
             // Simulace pro dny bez historických dat
             const lastKnownPriceUSD = historicalPrices[historicalPrices.length - 1].price;
-            const growthUSD = lastKnownPriceUSD * 0.01; // 1% růst od poslední známé ceny
-            return (lastKnownPriceUSD + growthUSD) * exchangeRate - initialValueCZK;
+            const growthUSD = lastKnownPriceUSD * 0.01;
+            const priceUSD = (lastKnownPriceUSD + growthUSD) * 14;
+            const profitCZK = (priceUSD - initialValueUSD) * exchangeRate;
+            return { y: profitCZK, priceUSD: priceUSD };
         });
+        return optionsData;
     }
 
     // Agregace dat pro denní/týdenní/měsíční zobrazení
@@ -116,7 +121,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function updateChart() {
         const exchangeRate = await getExchangeRate();
         const flatData = calculateFlatDaily();
-        const optionsData = await calculateOptionsDaily(exchangeRate);
+        const optionsDataFull = await calculateOptionsDaily(exchangeRate);
+        const optionsData = optionsDataFull.map(d => d.y); // Pouze zisk pro graf
         const flatAgg = aggregateData(flatData, view);
         const optionsAgg = aggregateData(optionsData, view);
 
@@ -127,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 labels: flatAgg.labels,
                 datasets: [
                     { label: 'Případ 1: Byt (Kč)', data: flatAgg.values, borderColor: '#1d9bf0', fill: false, tension: 0.1 },
-                    { label: 'Případ 2: TSLA (Kč)', data: optionsAgg.values, borderColor: '#fff', fill: false, tension: 0.1 }
+                    { label: 'Případ 2: TSLA (Kč)', data: optionsAgg.values, borderColor: '#fff', fill: false, tension: 0.1, customData: optionsDataFull }
                 ]
             },
             options: {
@@ -148,6 +154,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         callbacks: {
                             label: function(context) {
                                 const value = context.parsed.y;
+                                if (context.dataset.label === 'Případ 2: TSLA (Kč)') {
+                                    const priceUSD = context.dataset.customData[context.dataIndex].priceUSD;
+                                    return `${context.dataset.label}: ${value.toFixed(2)} Kč (Cena opcí: ${priceUSD.toFixed(2)} USD)`;
+                                }
                                 return `${context.dataset.label}: ${value.toFixed(2)} Kč`;
                             }
                         }
