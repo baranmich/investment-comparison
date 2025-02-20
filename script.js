@@ -28,8 +28,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Dynamické přidání inputů pro růst podle roku
     const currentYear = new Date('2025-02-20').getFullYear();
     const growthInputsDiv = document.getElementById('growthInputs');
-    growthInputsDiv.innerHTML = ''; // Vyčistíme obsah, aby se nepřidávalo víckrát
+    growthInputsDiv.innerHTML = ''; // Vyčistíme obsah
+
+    // Seznam let pro kontrolu duplicit
+    const addedYears = new Set();
     for (let year = 2025; year <= currentYear; year++) {
+        if (addedYears.has(year)) continue; // Přeskočíme, pokud už byl přidán
+        addedYears.add(year);
+
         const label = document.createElement('label');
         label.setAttribute('for', `growthInput-${year}`);
         label.textContent = `Nastav růst nemovitosti pro rok ${year} (%):`;
@@ -41,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.step = '0.1';
         growthInputsDiv.appendChild(label);
         growthInputsDiv.appendChild(input);
-        growthInputsDiv.appendChild(document.createElement('br')); // Odřádkování pro přehlednost
+        growthInputsDiv.appendChild(document.createElement('br'));
         input.addEventListener('change', updateChart);
     }
 
