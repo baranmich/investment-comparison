@@ -35,13 +35,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.addEventListener('change', updateChart);
     }
 
+    // Načtení dat z options_data.json a aktualizace popisu Případu 2
+    async function loadOptionsData() {
+        let historicalPrices = [];
+        try {
+            const response = await fetch('./options_data.json');
+            const data = await response.json();
+            historicalPrices = data.prices;
+            const latestEntry = historicalPrices[historicalPrices.length - 1];
+            document.getElementById('optionValue').textContent = `${latestEntry.optionPrice.toFixed(2)} USD`;
+        } catch (error) {
+            console.warn('Načítání options_data.json selhalo:', error);
+            document.getElementById('optionValue').textContent = '55.67 USD'; // Fallback
+            historicalPrices = [{ date: "19.02.2025", optionPrice: 55.67, exchangeRate: 23 }];
+        }
+        return historicalPrices;
+    }
+
     // Případ 1: Byt - růst ceny + nájemné od 7/2025
     function calculateFlatDaily() {
         const flatBasePrice = 8288911;
         let price = flatBasePrice;
         let totalRent = 0;
 
-        const result = days.map(day => {
+        return days.map(day => {
             const currentDate = new Date(day.split('.').reverse().join('-'));
             const year = currentDate.getFullYear();
             const growthInput = document.getElementById(`growthInput-${year}`);
@@ -56,24 +73,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return price - flatBasePrice + totalRent;
         });
-        console.log('Flat Data:', result); // Ladící výpis
-        return result;
     }
 
     // Případ 2: TSLA opce - vrací zisk a cenu opce z JSON
-    async function calculateOptionsDaily() {
+    async function calculateOptionsDaily(historicalPrices) {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
-        let historicalPrices = [];
-        try {
-            const response = await fetch('./options_data.json');
-            const data = await response.json();
-            historicalPrices = data.prices;
-        } catch (error) {
-            console.warn('Načítání options_data.json selhalo:', error);
-            historicalPrices = [{ date: "19.02.2025", optionPrice: 55.67, exchangeRate: 23 }];
-        }
 
-        const result = days.map(day => {
+        return days.map(day => {
             const historicalEntry = historicalPrices.find(entry => entry.date === day);
             let priceUSDPerOption, exchangeRate;
             if (historicalEntry) {
@@ -88,8 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const profitCZK = (priceUSDTotal - initialValueUSD) * exchangeRate;
             return { profitCZK: profitCZK, priceUSD: priceUSDPerOption };
         });
-        console.log('Options Data:', result); // Ladící výpis
-        return result;
     }
 
     // Agregace dat pro denní/týdenní/měsíční zobrazení
@@ -120,8 +124,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Funkce pro aktualizaci grafu
     async function updateChart() {
+        const historicalPrices = await loadOptionsData();
         const flatData = calculateFlatDaily();
-        const optionsDataFull = await calculateOptionsDaily();
+        const optionsDataFull = await calculateOptionsDaily(historicalPrices);
         const flatAgg = aggregateData(flatData, view, true);
         const optionsAgg = aggregateData(optionsDataFull, view);
 
