@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const ctx = document.getElementById('investmentChart').getContext('2d');
-    const growthInput = document.getElementById('growthInput');
     let chart;
     let view = 'daily';
 
@@ -14,16 +13,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Načtení směnného kurzu z API ČNB pro dnešek
     async function getExchangeRate() {
-        const today = new Date('2025-02-20').toISOString().split('T')[0]; // Dynamicky dnešek
+        const today = new Date('2025-02-20').toISOString().split('T')[0];
         try {
             const response = await fetch(`https://api.cnb.cz/cnbapi/exrates/daily?date=${today}&lang=EN`);
             const data = await response.json();
             const usdRate = data.rates.find(rate => rate.currencyCode === 'USD');
-            return usdRate ? usdRate.rate / usdRate.amount : 23; // Fallback 23 Kč/USD
+            return usdRate ? usdRate.rate / usdRate.amount : 23;
         } catch (error) {
             console.warn('Načítání kurzu z ČNB selhalo:', error);
-            return 23; // Fallback hodnota
+            return 23;
         }
+    }
+
+    // Dynamické přidání inputů pro růst podle roku
+    const currentYear = new Date('2025-02-20').getFullYear();
+    const growthInputsDiv = document.getElementById('growthInputs');
+    for (let year = 2025; year <= currentYear; year++) {
+        const label = document.createElement('label');
+        label.setAttribute('for', `growthInput-${year}`);
+        label.textContent = `Nastav růst nemovitosti pro rok ${year} (%):`;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = `growthInput-${year}`;
+        input.value = year === 2025 ? 3 : 5; // 3 % pro 2025, 5 % pro další roky
+        input.min = '0';
+        input.step = '0.1';
+        growthInputsDiv.appendChild(label);
+        growthInputsDiv.appendChild(input);
+        input.addEventListener('change', updateChart); // Aktualizace grafu při změně
     }
 
     // Případ 1: Byt - růst ceny + nájemné od 7/2025
@@ -31,14 +48,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const flatBasePrice = 8288911;
         let price = flatBasePrice;
         let totalRent = 0;
-        const dailyGrowth = (1 + parseFloat(growthInput.value) / 100) ** (1 / 365);
 
         return days.map(day => {
-            price = price * dailyGrowth;
             const currentDate = new Date(day.split('.').reverse().join('-'));
+            const year = currentDate.getFullYear();
+            const growthInput = document.getElementById(`growthInput-${year}`);
+            const yearlyGrowth = growthInput ? parseFloat(growthInput.value) / 100 : 0.03; // Default 3 %
+            const dailyGrowth = (1 + yearlyGrowth) ** (1 / 365);
+            price = price * dailyGrowth;
+
             const rentStart = new Date('2025-07-01');
             if (currentDate >= rentStart && currentDate.getDate() === 1) {
-                const monthsSinceRentStart = (currentDate.getFullYear() - 2025) * 12 + currentDate.getMonth() - 6;
+                const monthsSinceRentStart = (year - 2025) * 12 + currentDate.getMonth() - 6;
                 totalRent += 24200 * (1.05 ** Math.floor(monthsSinceRentStart / 12));
             }
             return price - flatBasePrice + totalRent;
@@ -48,11 +69,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Případ 2: TSLA opce - simulace převedená na Kč s reálným kurzem
     async function calculateOptionsDaily(exchangeRate) {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
-        const initialValueCZK = initialValueUSD * exchangeRate; // Převod na Kč
+        const initialValueCZK = initialValueUSD * exchangeRate;
         return days.map((_, index) => {
-            if (index === 0) return 0; // První den = 0
-            const growthUSD = initialValueUSD * 0.01; // Simulace 1% růst v USD
-            return (initialValueUSD + growthUSD) * exchangeRate - initialValueCZK; // Převod na Kč
+            if (index === 0) return 0;
+            const growthUSD = initialValueUSD * 0.01;
+            return (initialValueUSD + growthUSD) * exchangeRate - initialValueCZK;
         });
     }
 
@@ -70,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Funkce pro aktualizaci grafu
     async function updateChart() {
-        const exchangeRate = await getExchangeRate(); // Načti kurz pro dnešek
+        const exchangeRate = await getExchangeRate();
         const flatData = calculateFlatDaily();
         const optionsData = await calculateOptionsDaily(exchangeRate);
         const flatAgg = aggregateData(flatData, view);
@@ -125,9 +146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         updateChart();
     };
-
-    // Reakce na změnu růstu nemovitosti
-    growthInput.addEventListener('change', updateChart);
 
     // Počáteční vykreslení grafu
     await updateChart();

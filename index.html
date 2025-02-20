@@ -34,8 +34,10 @@
         </div>
     </header>
     <main>
-        <label for="growthInput">Nastav růst nemovitosti (%):</label>
-        <input type="number" id="growthInput" value="3" min="0" step="0.1">
+        <div id="growthInputs">
+            <label for="growthInput-2025">Nastav růst nemovitosti pro rok 2025 (%):</label>
+            <input type="number" id="growthInput-2025" value="3" min="0" step="0.1">
+        </div>
         <div id="viewSelector">
             <button class="active" onclick="changeView('daily')">Denní</button>
             <button onclick="changeView('weekly')">Týdenní</button>
@@ -44,7 +46,7 @@
         <canvas id="investmentChart"></canvas>
         <div id="profit">
             <p>Zhodnocení Případ 1: <span id="profit1">0 Kč</span></p>
-            <p>Zhodnocení Případ 2: <span id="profit2">0 USD</span></p>
+            <p>Zhodnocení Případ 2: <span id="profit2">0 Kč</span></p>
         </div>
     </main>
     <script src="script.js"></script>
