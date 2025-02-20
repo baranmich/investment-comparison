@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Případ 2: TSLA opce - vrací zisk a cenu opce z JSON
     async function calculateOptionsDaily() {
         const initialValueUSD = 14 * 55.67; // 779.38 USD
-
         let historicalPrices = [];
         try {
             const response = await fetch('./options_data.json');
@@ -80,8 +79,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 exchangeRate = historicalEntry.exchangeRate;
             } else {
                 const lastEntry = historicalPrices[historicalPrices.length - 1];
-                priceUSDPerOption = lastEntry.optionPrice + (lastEntry.optionPrice * 0.01); // Simulace 1% růstu
-                exchangeRate = lastEntry.exchangeRate; // Použije poslední známý kurz
+                priceUSDPerOption = lastEntry.optionPrice + (lastEntry.optionPrice * 0.01);
+                exchangeRate = lastEntry.exchangeRate;
             }
             const priceUSDTotal = priceUSDPerOption * 14;
             const profitCZK = (priceUSDTotal - initialValueUSD) * exchangeRate;
@@ -90,26 +89,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Agregace dat pro denní/týdenní/měsíční zobrazení
-    function aggregateData(data, period) {
-        if (period === 'daily') return { labels: days, values: data.map(item => item.profitCZK), customData: data };
-        const result = { labels: [], values: [], customData: [] };
-        let step = period === 'weekly' ? 7 : 30;
-        for (let i = 0; i < data.length; i += step) {
-            const index = Math.min(i + step - 1, data.length - 1);
-            result.labels.push(days[i]);
-            result.values.push(data[index].profitCZK);
-            result.customData.push(data[index]);
+    function aggregateData(data, period, isFlat = false) {
+        if (isFlat) {
+            // Pro Případ 1 - flatData je prosté pole čísel
+            if (period === 'daily') return { labels: days, values: data };
+            const result = { labels: [], values: [] };
+            let step = period === 'weekly' ? 7 : 30;
+            for (let i = 0; i < data.length; i += step) {
+                const index = Math.min(i + step - 1, data.length - 1);
+                result.labels.push(days[i]);
+                result.values.push(data[index]);
+            }
+            return result;
+        } else {
+            // Pro Případ 2 - optionsDataFull je pole objektů
+            if (period === 'daily') return { labels: days, values: data.map(item => item.profitCZK), customData: data };
+            const result = { labels: [], values: [], customData: [] };
+            let step = period === 'weekly' ? 7 : 30;
+            for (let i = 0; i < data.length; i += step) {
+                const index = Math.min(i + step - 1, data.length - 1);
+                result.labels.push(days[i]);
+                result.values.push(data[index].profitCZK);
+                result.customData.push(data[index]);
+            }
+            return result;
         }
-        return result;
     }
 
     // Funkce pro aktualizaci grafu
     async function updateChart() {
         const flatData = calculateFlatDaily();
         const optionsDataFull = await calculateOptionsDaily();
-        const optionsData = optionsDataFull.map(d => d.profitCZK);
-        const flatAgg = aggregateData(flatData, view);
-        const optionsAgg = aggregateData(optionsDataFull, view);
+        const flatAgg = aggregateData(flatData, view, true); // Případ 1
+        const optionsAgg = aggregateData(optionsDataFull, view); // Případ 2
 
         if (chart) chart.destroy();
         chart = new Chart(ctx, {
@@ -117,7 +129,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             data: {
                 labels: flatAgg.labels,
                 datasets: [
-                    { label: 'Případ 1: Byt (Kč)', data: flatAgg.values, borderColor: '#1d9bf0', fill: false, tension: 0.1 },
+                    { 
+                        label: 'Případ 1: Byt (Kč)', 
+                        data: flatAgg.values, 
+                        borderColor: '#1d9bf0', 
+                        fill: false, 
+                        tension: 0.1 
+                    },
                     { 
                         label: 'Případ 2: TSLA (Kč)', 
                         data: optionsAgg.values, 
@@ -161,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         document.getElementById('profit1').textContent = `${flatData[flatData.length - 1].toFixed(2)} Kč`;
-        document.getElementById('profit2').textContent = `${optionsData[optionsData.length - 1].toFixed(2)} Kč`;
+        document.getElementById('profit2').textContent = `${optionsDataFull[optionsDataFull.length - 1].profitCZK.toFixed(2)} Kč`;
     }
 
     // Přepínání zobrazení
